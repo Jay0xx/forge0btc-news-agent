@@ -1,0 +1,10 @@
+{
+  "servers": {
+    "aibtc": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["@aibtc/mcp-server"],
+      "env": { "NETWORK": "mainnet" }
+    }
+  }
+}

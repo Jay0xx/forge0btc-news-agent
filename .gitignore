@@ -1,0 +1,20 @@
+# Generated runtime artifacts
+heartbeat-output.json
+btc-sign-output.txt
+stacks-sign-output.txt
+correspondents-output.txt
+correspondents-500.txt
+leaderboard-output.txt
+leaderboard-500.txt
+
+# Nested skills workspace dependencies
+aibtcdev-skills/node_modules/
+
+# Local daemon state and logs
+daemon/*.md
+!daemon/loop.md
+
+# OS and editor noise
+.DS_Store
+Thumbs.db
+.vscode/.ropeproject/

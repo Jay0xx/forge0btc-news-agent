@@ -1,0 +1,110 @@
+{
+  "version": 1,
+  "skills": {
+    "aibtc-news": {
+      "source": "aibtcdev/skills",
+      "sourceType": "github",
+      "computedHash": "e9c700a455a50e6a16469e34d32f559050bc71e5e24a0e7705f08bf518809855"
+    },
+    "aibtc-news-correspondent": {
+      "source": "aibtcdev/skills",
+      "sourceType": "github",
+      "computedHash": "eb8e8916d36784857e88404f0531e63d9384ed20470a210bb70c504189afd492"
+    },
+    "aibtc-news-deal-flow": {
+      "source": "aibtcdev/skills",
+      "sourceType": "github",
+      "computedHash": "73f78934b6315a0db9565ec9a14f2136566a5f0c6b8b0bbc5b5352b47447b9f3"
+    },
+    "aibtc-news-fact-checker": {
+      "source": "aibtcdev/skills",
+      "sourceType": "github",
+      "computedHash": "974a1d17f29922b806c0d700e315db49d4f6d2c5c67f93c031b26b4a5e841a74"
+    },
+    "aibtc-news-protocol": {
+      "source": "aibtcdev/skills",
+      "sourceType": "github",
+      "computedHash": "639d2e4c7e1b4ca61c776f6c26ac74870fe2148b2a531c3c6f52b8fd709eae41"
+    },
+    "aibtc-news-scout": {
+      "source": "aibtcdev/skills",
+      "sourceType": "github",
+      "computedHash": "d13d47c59ffe647df2c5df2814c3fb2ee902d19e88d8a3a1b0ff5dcfe7db9748"
+    },
+    "arxiv-research": {
+      "source": "aibtcdev/skills",
+      "sourceType": "github",
+      "computedHash": "1b117d11bd36f30bb4ed759fd8b2a1b1e94068d96f4a0251aefea9d85e9cb618"
+    },
+    "btc": {
+      "source": "aibtcdev/skills",
+      "sourceType": "github",
+      "computedHash": "404c2e9402dad73393f3589397af70300d528cdee16bc60a3daacc6e72032dd5"
+    },
+    "clarity-audit": {
+      "source": "aibtcdev/skills",
+      "sourceType": "github",
+      "computedHash": "0d7c6e6505bf6a278e4a4291c0d3e91449ef58aac6b0e3d16b5333d4c41cd8fc"
+    },
+    "clarity-check": {
+      "source": "aibtcdev/skills",
+      "sourceType": "github",
+      "computedHash": "2109cab0def04434116054001cfec248972851f8ad6e8f2a8efcc4ead4447e18"
+    },
+    "defi": {
+      "source": "aibtcdev/skills",
+      "sourceType": "github",
+      "computedHash": "383b8ac2bc7e868599eaf9b475231ded6bc6101f208c336532e37e057e8a4492"
+    },
+    "identity": {
+      "source": "aibtcdev/skills",
+      "sourceType": "github",
+      "computedHash": "9b8621b79a8ad705c6a3af87e4dabe5545bc90cad4adc65999eae8ef6b7fe3f0"
+    },
+    "inbox": {
+      "source": "aibtcdev/skills",
+      "sourceType": "github",
+      "computedHash": "a8fbc8c466b72da43c76ff260f0ce500cdbe9324372d42f04847648320afa03f"
+    },
+    "paperboy": {
+      "source": "aibtcdev/skills",
+      "sourceType": "github",
+      "computedHash": "8145c844f1075e6667e7d3459cee5f9aca07a0287e94dd453a76688030486003"
+    },
+    "query": {
+      "source": "aibtcdev/skills",
+      "sourceType": "github",
+      "computedHash": "ba497731cf71c1808badb1fc3e1398bd10b8a439733b062035d5a2adb7f54944"
+    },
+    "sbtc": {
+      "source": "aibtcdev/skills",
+      "sourceType": "github",
+      "computedHash": "a5a34823022956da88adb78ab335ba25252efe5543a58f9d8e6883b9ad8c32b4"
+    },
+    "signing": {
+      "source": "aibtcdev/skills",
+      "sourceType": "github",
+      "computedHash": "55b2ae09ba36dd86108bf24002d4c779b20694ae63429bbf9bb1c7fdbfcff332"
+    },
+    "stx": {
+      "source": "aibtcdev/skills",
+      "sourceType": "github",
+      "computedHash": "14e93fcd7073bcb2358677736dc98660cf4b5c3bbeea3b5270ad943a9feecf47"
+    },
+    "tenero": {
+      "source": "aibtcdev/skills",
+      "sourceType": "github",
+      "computedHash": "ec096b8de51fe70af6d473725f1b80fa967cd40725813b839368113c5e218fd2"
+    },
+    "wallet": {
+      "source": "aibtcdev/skills",
+      "sourceType": "github",
+      "computedHash": "a59253fb5a39308296ef4c88d06a91b943bcb472ac808377c0059d0690b32531"
+    },
+    "x402": {
+      "source": "aibtcdev/skills",
+      "sourceType": "github",
+      "computedHash": "9031678c40786655777ee9208287f9ff7bf1e9b765bb84fda5c8a97faf99d226"
+    }
+  }
+}

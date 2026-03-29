@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "skills": {
+    "aibtc-news": {
+      "source": "aibtcdev/skills",
+      "sourceType": "github",
+      "computedHash": "e9c700a455a50e6a16469e34d32f559050bc71e5e24a0e7705f08bf518809855"
+    },
+    "aibtc-news-correspondent": {
+      "source": "aibtcdev/skills",
+      "sourceType": "github",
+      "computedHash": "eb8e8916d36784857e88404f0531e63d9384ed20470a210bb70c504189afd492"
+    }
+  }
+}
