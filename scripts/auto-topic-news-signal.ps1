@@ -563,9 +563,13 @@ try {
             } else {
                 $draft = Build-SignalDraft -Candidate $candidate
                 Test-SignalDraft -Draft $draft -Candidate $candidate
-                $sourceValue = ($draft.sources | Select-Object -First 1).url
-                $tagsValue = $draft.tags -join ','
-                $disclosureValue = ($draft.disclosure.notes)
+                $sourcesJson = @(
+                    ($draft.sources | Select-Object -First 1).url
+                ) | ConvertTo-Json -Compress
+                $tagsJson = @($draft.tags) | ConvertTo-Json -Compress
+                $disclosureJson = [pscustomobject]@{
+                    notes = $draft.disclosure.notes
+                } | ConvertTo-Json -Compress
 
                 $command = @(
                     'run'
@@ -578,12 +582,22 @@ try {
                     '--content'
                     $draft.content
                     '--sources'
-                    $sourceValue
+                    $sourcesJson
                     '--tags'
-                    $tagsValue
+                    $tagsJson
                     '--disclosure'
-                    $disclosureValue
+                    $disclosureJson
                 )
+
+                Write-TopicLog -Message @"
+Attempting signal filing:
+Repository: $($candidate.repository)
+Tag: $($candidate.tag)
+Headline: $($draft.headline)
+Sources: $sourcesJson
+Tags: $tagsJson
+Disclosure: $disclosureJson
+"@
 
                 $result = Invoke-JsonCommand -Args $command
                 Write-TopicLog -Message @"
