@@ -20,6 +20,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+if (-not $env:NETWORK) {
+    $env:NETWORK = 'mainnet'
+}
+
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $workspaceRoot = Join-Path $scriptRoot '..'
 $skillsRoot = Join-Path $workspaceRoot 'aibtcdev-skills'
@@ -134,42 +138,6 @@ function Get-NewsStatus {
     )
 
     return Invoke-JsonCommand -Args $command
-}
-
-function Get-DailyReportCandidate {
-    $headers = @{
-        'Accept' = 'application/json'
-        'User-Agent' = 'BTC-AI-AGENT'
-    }
-
-    $report = Invoke-RestMethod -Uri 'https://aibtc.news/api/report' -Headers $headers -Method Get
-    $headline = "AIBTC report shows $($report.signalsToday) signals and $($report.activeCorrespondents) active correspondents"
-    $content = @"
-The daily AIBTC report shows $($report.signalsToday) signals today and $($report.activeCorrespondents) active correspondents across $($report.totalBeats) beats.
-
-Latest brief: $($report.latestBrief.date)
-Why it matters: the network is still producing at high throughput, which is useful context for Infrastructure coverage and operational planning.
-"@
-
-    if ($headline.Length -gt 120) {
-        $headline = $headline.Substring(0, 117).Trim() + '...'
-    }
-
-    if ($content.Length -gt 1000) {
-        $content = $content.Substring(0, 997).Trim() + '...'
-    }
-
-    return [pscustomobject]@{
-        repository = 'aibtc.news/report'
-        name = 'Daily Report'
-        tag = $report.date
-        publishedAt = [datetime]::ParseExact($report.date, 'yyyy-MM-dd', $null)
-        htmlUrl = 'https://aibtc.news/api/report'
-        body = $content
-        featureLead = $headline
-        dedupeKey = "report-$($report.date)"
-        sourceKind = 'daily-report'
-    }
 }
 
 function Get-RecentSignals {
@@ -295,10 +263,11 @@ function Get-TextTokens {
         return @()
     }
 
-    return @(
-        $normalized -split ' '
-        | Where-Object { $_ -and $_.Length -ge 3 -and -not $stopWords.ContainsKey($_) }
-    )
+    $tokens = $normalized -split ' ' | Where-Object {
+        $_ -and $_.Length -ge 3 -and -not $stopWords.ContainsKey($_)
+    }
+
+    return @($tokens)
 }
 
 function Test-TextOverlap {
@@ -328,12 +297,6 @@ function Test-TextOverlap {
 
 function Get-TopicCandidates {
     $candidates = @()
-
-    try {
-        $candidates += Get-DailyReportCandidate
-    } catch {
-        Write-Host "Skipping daily report: $($_.Exception.Message)"
-    }
 
     $repositories = @(
         'aibtcdev/aibtc-mcp-server',
@@ -417,7 +380,7 @@ function Test-AlreadyCovered {
             continue
         }
 
-        if (Normalize-Text -Text $text -eq Normalize-Text -Text $candidateText) {
+        if ((Normalize-Text -Text $text) -eq (Normalize-Text -Text $candidateText)) {
             return $true
         }
 
@@ -456,36 +419,15 @@ $Implication
 "@
     }
 
-    if ($Candidate.sourceKind -eq 'daily-report') {
-        $claim = "AIBTC's daily report shows $($Candidate.featureLead -replace '^AIBTC report shows ', '') today, which means the network is still producing at high throughput."
-        $evidence = "Evidence: the live report lists $($Candidate.body -replace '^The daily AIBTC report shows ', '')"
-        $implication = "Implication: agents should treat Infrastructure coverage as a high-activity feed and focus on operational changes, backlog reduction, and anything that changes how correspondents file, review, or route signals."
-
-        return [pscustomobject]@{
-            headline = "AIBTC report shows $($Candidate.featureLead -replace '^AIBTC report shows ', '')"
-            content = Format-ThreePartBody -Claim $claim -Evidence $evidence -Implication $implication
-            sources = @(
-                @{ url = $Candidate.htmlUrl; title = 'AIBTC Daily Report' }
-            )
-            tags = @('infrastructure', 'aibtc-news', 'report', 'throughput')
-            disclosure = [pscustomobject]@{
-                models = @('GPT-5.4 mini')
-                tools = @('PowerShell', 'AIBTC daily report API', 'aibtc-news CLI')
-                skills = @('aibtc-news')
-                notes = 'Auto-selected from the live daily report.'
-            }
-        }
-    }
-
     $headline = "AIBTC Infrastructure: $($Candidate.featureLead)"
 
     if ($headline.Length -gt 120) {
         $headline = $headline.Substring(0, 117).Trim() + '...'
     }
 
-    $claim = "AIBTC $($Candidate.repository.Split('/')[1]) shipped $($Candidate.name) on $($Candidate.publishedAt.ToString('yyyy-MM-dd')), and the release changes the tooling layer agents depend on."
-    $evidence = "Evidence: the release notes highlight $($Candidate.featureLead)."
-    $implication = "Implication: correspondents should flag this as an operational update, not a generic changelog item, by stating which agent workflow improves or which failure mode is reduced."
+    $claim = "AIBTC $($Candidate.repository.Split('/')[1]) shipped $($Candidate.name) on $($Candidate.publishedAt.ToString('yyyy-MM-dd')), and the release changes the tooling layer agents depend on rather than just bumping version metadata."
+    $evidence = "Evidence: the release notes highlight $($Candidate.featureLead), which is the specific feature-level change that alters how integrations route calls, validate capabilities, and stay aligned with the current tool surface."
+    $implication = "Operational thesis: this is a workflow update, not a cosmetic release, because stale routing or outdated capability checks can miss the new path and leave automation pointed at the wrong interface. Correspondents should spell out which agent capability is now unlocked or safer to use."
 
     $content = Format-ThreePartBody -Claim $claim -Evidence $evidence -Implication $implication
 
@@ -506,6 +448,62 @@ $Implication
             skills = @('aibtc-news')
             notes = 'Auto-selected from the freshest Infrastructure release candidate.'
         }
+    }
+}
+
+function Test-SignalDraft {
+    param(
+        [Parameter(Mandatory = $true)]
+        $Draft,
+
+        [Parameter(Mandatory = $true)]
+        $Candidate
+    )
+
+    $contentSections = @(
+        'What changed:'
+        'What it means:'
+        'Operational thesis:'
+        'What to do:'
+    )
+
+    if (-not $Draft.headline -or $Draft.headline.Length -gt 120) {
+        throw 'Draft headline must be present and 120 characters or fewer.'
+    }
+
+    if (-not $Draft.content -or $Draft.content.Length -gt 1000) {
+        throw 'Draft content must be present and 1000 characters or fewer.'
+    }
+
+    foreach ($section in $contentSections) {
+        if ($Draft.content -notmatch [regex]::Escape($section)) {
+            throw "Draft content must include the section marker: $section"
+        }
+    }
+
+    if (-not $Draft.sources -or @($Draft.sources).Count -lt 1 -or @($Draft.sources).Count -gt 5) {
+        throw 'Draft sources must contain 1 to 5 primary URLs.'
+    }
+
+    foreach ($source in @($Draft.sources)) {
+        if (-not $source.url -or -not ($source.url -match '^https://')) {
+            throw 'Draft sources must use stable HTTPS URLs.'
+        }
+        if (-not $source.title) {
+            throw 'Each draft source must include a title.'
+        }
+    }
+
+    if (-not $Draft.tags -or @($Draft.tags).Count -lt 1 -or @($Draft.tags).Count -gt 10) {
+        throw 'Draft tags must contain 1 to 10 entries.'
+    }
+
+    if (-not $Draft.disclosure -or -not $Draft.disclosure.notes) {
+        throw 'Draft disclosure must include notes.'
+    }
+
+    if ($Candidate.sourceKind -eq 'release' -and ($Draft.headline -notmatch '\d')) {
+        throw 'Release-based drafts must include a specific number in the headline.'
     }
 }
 
@@ -553,6 +551,7 @@ while ($true) {
             Write-Host "All candidate topics are already covered in recent signals; nothing filed."
         } else {
             $draft = Build-SignalDraft -Candidate $candidate
+            Test-SignalDraft -Draft $draft -Candidate $candidate
             $sourceValue = ($draft.sources | Select-Object -First 1).url
             $tagsValue = $draft.tags -join ','
             $disclosureValue = ($draft.disclosure.notes)

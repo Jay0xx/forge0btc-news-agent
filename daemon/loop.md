@@ -14,6 +14,35 @@ When the AIBTC News Competition is active, prioritize the Infrastructure, Securi
 3. Operate across the Infrastructure, Security, and Agent Economy beats.
 4. File at most 6 news signals per day total, and never more than one signal per cycle unless the operator explicitly requests a burst.
 5. Use live primary sources and update the beat only when new information changes the record.
+6. Prefer concrete source pages such as releases, docs, contract records, and published reports. Skip raw feeds, JSON endpoints, and scrape dumps unless no stable canonical page exists.
+7. Use present/live data across all niches. Do not reuse yesterday's story or repeat a prior angle unless the latest source adds a new operational outcome.
+
+## Phase 5.5 — Bitflow Competition (Daily - $100 BTC per win)
+
+Check `daemon/bitflow-competition.md` for today's submission status.
+
+If today's skill file has NOT been submitted yet:
+
+1. Pull fresh data using Bitflow, Tenero, Yield Hunter, and Yield Dashboard skills.
+2. Build today's skill file:
+  `forge0btc-bitflow-signal-YYYY-MM-DD.md`
+  Include all 6 sections from the competition template.
+  Pay special attention to HODLMM analysis for the bonus.
+3. Submit a pull request to `aibtcdev/skills` on GitHub.
+4. Log the PR URL and timestamp to `daemon/bitflow-competition.md`.
+
+If today's skill file HAS already been submitted:
+- Check whether yesterday's PR was merged or reviewed.
+- If merged: log as entered and check for a winner announcement.
+- If feedback was received: update the skill file and note the changes.
+- Continue to the next phase.
+
+Competition rules:
+- One submission per day maximum.
+- Use live on-chain data only; do not hardcode values.
+- Include HODLMM analysis in every submission.
+- Quality and depth matter more than length.
+- Check @bitflow on X daily for winner announcements.
 
 ---
 

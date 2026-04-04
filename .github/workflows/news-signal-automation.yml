@@ -1,0 +1,63 @@
+name: News Signal Automation
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/5 * * * *'
+
+concurrency:
+  group: news-signal-automation
+  cancel-in-progress: true
+
+jobs:
+  file-news-signals:
+    runs-on: windows-latest
+    env:
+      NETWORK: mainnet
+      AIBTC_WALLET_PASSWORD: ${{ secrets.AIBTC_WALLET_PASSWORD }}
+      WALLET_PASSWORD: ${{ secrets.AIBTC_WALLET_PASSWORD }}
+      AIBTC_WALLET_MNEMONIC: ${{ secrets.AIBTC_WALLET_MNEMONIC }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install skills dependencies
+        shell: pwsh
+        run: |
+          Set-Location $env:GITHUB_WORKSPACE
+          Push-Location .\aibtcdev-skills
+          bun install
+          Pop-Location
+
+      - name: Import wallet into runner profile
+        shell: pwsh
+        run: |
+          Set-Location $env:GITHUB_WORKSPACE
+          if (-not $env:AIBTC_WALLET_MNEMONIC) {
+            throw 'Missing secret: AIBTC_WALLET_MNEMONIC'
+          }
+          if (-not $env:AIBTC_WALLET_PASSWORD) {
+            throw 'Missing secret: AIBTC_WALLET_PASSWORD'
+          }
+          Push-Location .\aibtcdev-skills
+          bun run wallet/wallet.ts import --name forge0btc --mnemonic "$env:AIBTC_WALLET_MNEMONIC" --password "$env:AIBTC_WALLET_PASSWORD" --network mainnet
+          Pop-Location
+
+      - name: File a news signal if the window is open
+        shell: pwsh
+        run: |
+          Set-Location $env:GITHUB_WORKSPACE
+          powershell -ExecutionPolicy Bypass -File .\scripts\auto-topic-news-signal.ps1 -WalletPassword "$env:AIBTC_WALLET_PASSWORD" -IntervalMinutes 5
+
+      - name: Upload topic log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: news-topic-log
+          path: daemon/news-topic.md
+          if-no-files-found: ignore

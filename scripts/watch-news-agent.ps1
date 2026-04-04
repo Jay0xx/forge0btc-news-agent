@@ -17,6 +17,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+if (-not $env:NETWORK) {
+    $env:NETWORK = 'mainnet'
+}
+
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $workspaceRoot = Join-Path $scriptRoot '..'
 $skillsRoot = Join-Path $workspaceRoot 'aibtcdev-skills'
