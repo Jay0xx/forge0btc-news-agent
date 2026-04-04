@@ -28,6 +28,7 @@ $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $workspaceRoot = Join-Path $scriptRoot '..'
 $skillsRoot = Join-Path $workspaceRoot 'aibtcdev-skills'
 $topicLog = Join-Path $workspaceRoot 'daemon\news-topic.md'
+$errorLog = Join-Path $workspaceRoot 'daemon\news-signal-automation-error.log'
 $configPath = Join-Path $env:USERPROFILE '.aibtc\config.json'
 $walletsPath = Join-Path $env:USERPROFILE '.aibtc\wallets.json'
 
@@ -520,73 +521,101 @@ function Write-TopicLog {
     Add-Content -Path $topicLog -Value "`r`n## $(Get-Date -Format 'yyyy-MM-ddTHH:mm:ssK')`r`n$Message`r`n"
 }
 
-$bun = Resolve-BunPath -ExplicitPath $BunPath
-$script:WalletPassword = $WalletPassword
-Set-WalletEnvironment -Password $script:WalletPassword
-$context = Get-ActiveWalletContext
-$script:WalletId = $context.WalletId
-$script:BtcAddress = $context.BtcAddress
-$WalletId = $script:WalletId
-$BtcAddress = $script:BtcAddress
+function Write-ErrorLog {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Message
+    )
 
-while ($true) {
-    $status = Get-NewsStatus -Address $BtcAddress
-    $newsStatus = $status.status
-    $beat = $newsStatus.beat
-    $beatSlug = $beat.slug
-    $beatName = $beat.name
+    Add-Content -Path $errorLog -Value "`r`n## $(Get-Date -Format 'yyyy-MM-ddTHH:mm:ssK')`r`n$Message`r`n"
+}
 
-    if (-not $newsStatus.canFileSignal) {
-        Write-TopicLog -Message "Beat: $beatName ($beatSlug)`r`nSkipped: $($newsStatus.actions[0].description)"
-        Write-Host ($status | ConvertTo-Json -Depth 10)
-    } else {
-        $recentSignals = @(Get-RecentSignals -Limit 50)
-        $beatSignals = @(Get-RecentSignals -BeatSlug $beatSlug -Limit 20)
-        $allSignals = @($recentSignals + $beatSignals | Select-Object -Unique)
-        $candidates = Get-TopicCandidates
-        $candidate = Select-TopicCandidate -Candidates $candidates -Signals $allSignals
+try {
+    $bun = Resolve-BunPath -ExplicitPath $BunPath
+    $script:WalletPassword = $WalletPassword
+    Set-WalletEnvironment -Password $script:WalletPassword
+    $context = Get-ActiveWalletContext
+    $script:WalletId = $context.WalletId
+    $script:BtcAddress = $context.BtcAddress
+    $WalletId = $script:WalletId
+    $BtcAddress = $script:BtcAddress
 
-        if (-not $candidate) {
-            Write-TopicLog -Message "Skipped: all candidate topics are already covered in recent signals."
-            Write-Host "All candidate topics are already covered in recent signals; nothing filed."
+    while ($true) {
+        $status = Get-NewsStatus -Address $BtcAddress
+        $newsStatus = $status.status
+        $beat = $newsStatus.beat
+        $beatSlug = $beat.slug
+        $beatName = $beat.name
+
+        if (-not $newsStatus.canFileSignal) {
+            Write-TopicLog -Message "Beat: $beatName ($beatSlug)`r`nSkipped: $($newsStatus.actions[0].description)"
+            Write-Host ($status | ConvertTo-Json -Depth 10)
         } else {
-            $draft = Build-SignalDraft -Candidate $candidate
-            Test-SignalDraft -Draft $draft -Candidate $candidate
-            $sourceValue = ($draft.sources | Select-Object -First 1).url
-            $tagsValue = $draft.tags -join ','
-            $disclosureValue = ($draft.disclosure.notes)
+            $recentSignals = @(Get-RecentSignals -Limit 50)
+            $beatSignals = @(Get-RecentSignals -BeatSlug $beatSlug -Limit 20)
+            $allSignals = @($recentSignals + $beatSignals | Select-Object -Unique)
+            $candidates = Get-TopicCandidates
+            $candidate = Select-TopicCandidate -Candidates $candidates -Signals $allSignals
 
-            $command = @(
-                'run'
-                (Join-Path $skillsRoot 'aibtc-news\aibtc-news.ts')
-                'file-signal'
-                '--beat-id'
-                $beatSlug
-                '--headline'
-                $draft.headline
-                '--content'
-                $draft.content
-                '--sources'
-                $sourceValue
-                '--tags'
-                $tagsValue
-                '--disclosure'
-                $disclosureValue
-            )
+            if (-not $candidate) {
+                Write-TopicLog -Message "Skipped: all candidate topics are already covered in recent signals."
+                Write-Host "All candidate topics are already covered in recent signals; nothing filed."
+            } else {
+                $draft = Build-SignalDraft -Candidate $candidate
+                Test-SignalDraft -Draft $draft -Candidate $candidate
+                $sourceValue = ($draft.sources | Select-Object -First 1).url
+                $tagsValue = $draft.tags -join ','
+                $disclosureValue = ($draft.disclosure.notes)
 
-            $result = Invoke-JsonCommand -Args $command
-            Write-TopicLog -Message @"
+                $command = @(
+                    'run'
+                    (Join-Path $skillsRoot 'aibtc-news\aibtc-news.ts')
+                    'file-signal'
+                    '--beat-id'
+                    $beatSlug
+                    '--headline'
+                    $draft.headline
+                    '--content'
+                    $draft.content
+                    '--sources'
+                    $sourceValue
+                    '--tags'
+                    $tagsValue
+                    '--disclosure'
+                    $disclosureValue
+                )
+
+                $result = Invoke-JsonCommand -Args $command
+                Write-TopicLog -Message @"
 Picked: $($candidate.repository) $($candidate.tag)
 Headline: $($draft.headline)
 Result: $($result.message)
 "@
-            Write-Host ($result | ConvertTo-Json -Depth 10)
+                Write-Host ($result | ConvertTo-Json -Depth 10)
+            }
         }
-    }
 
-    if (-not $Continuous) {
-        break
-    }
+        if (-not $Continuous) {
+            break
+        }
 
-    Start-Sleep -Seconds ($IntervalMinutes * 60)
+        Start-Sleep -Seconds ($IntervalMinutes * 60)
+    }
+}
+catch {
+    $errorRecord = $_
+    $errorMessage = @(
+        'Signal automation failed.'
+        "Message: $($errorRecord.Exception.Message)"
+        "Category: $($errorRecord.CategoryInfo.Category)"
+        "TargetObject: $($errorRecord.TargetObject)"
+        "FullyQualifiedErrorId: $($errorRecord.FullyQualifiedErrorId)"
+        "ScriptStackTrace: $($errorRecord.ScriptStackTrace)"
+        'ErrorRecord:'
+        ($errorRecord | Out-String).Trim()
+    ) -join "`r`n"
+
+    Write-ErrorLog -Message $errorMessage
+    Write-TopicLog -Message "Automation failed:`r`n$($errorRecord.Exception.Message)"
+    throw
 }

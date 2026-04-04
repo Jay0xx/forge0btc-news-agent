@@ -52,12 +52,25 @@ jobs:
         shell: pwsh
         run: |
           Set-Location $env:GITHUB_WORKSPACE
-          powershell -ExecutionPolicy Bypass -File .\scripts\auto-topic-news-signal.ps1 -WalletPassword "$env:AIBTC_WALLET_PASSWORD" -IntervalMinutes 5
+          $runLog = Join-Path $env:GITHUB_WORKSPACE 'daemon\news-signal-automation-run.log'
+          Start-Transcript -Path $runLog -Force | Out-Null
+          try {
+            & .\scripts\auto-topic-news-signal.ps1 -WalletPassword "$env:AIBTC_WALLET_PASSWORD" -IntervalMinutes 5
+          } catch {
+            Write-Host "Signal automation step failed."
+            Write-Host ($_ | Out-String)
+            throw
+          } finally {
+            Stop-Transcript | Out-Null
+          }
 
       - name: Upload topic log
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: news-topic-log
-          path: daemon/news-topic.md
+          path: |
+            daemon/news-topic.md
+            daemon/news-signal-automation-error.log
+            daemon/news-signal-automation-run.log
           if-no-files-found: ignore
