@@ -118,15 +118,15 @@ function Get-AgentStatus {
 function Get-LatestSignal {
     param(
         [Parameter(Mandatory = $true)]
-        [string]$BeatSlug
+        [string]$Address
     )
 
     $command = @(
         'run'
         (Join-Path $skillsRoot 'aibtc-news\aibtc-news.ts')
         'list-signals'
-        '--beat-id'
-        $BeatSlug
+        '--address'
+        $Address
         '--limit'
         '1'
     )
@@ -139,6 +139,28 @@ function Get-LatestSignal {
     }
 
     return $null
+}
+
+function Get-SignalField {
+    param(
+        [Parameter(Mandatory = $true)]
+        $Signal,
+
+        [Parameter(Mandatory = $true)]
+        [string[]]$Names,
+
+        [Parameter(Mandatory = $false)]
+        $DefaultValue = $null
+    )
+
+    foreach ($name in $Names) {
+        $property = $Signal.PSObject.Properties[$name]
+        if ($property -and $null -ne $property.Value -and $property.Value -ne '') {
+            return $property.Value
+        }
+    }
+
+    return $DefaultValue
 }
 
 function Get-ContentSnippet {
@@ -199,11 +221,11 @@ function Append-WatchLog {
     $beatName = $StatusPayload.status.beat.name
     $signalsToday = $StatusPayload.status.signalsToday
     $waitMinutes = if ($StatusPayload.status.waitMinutes) { "$($StatusPayload.status.waitMinutes) minutes" } else { 'none' }
-    $signalHeadline = if ($LatestSignal) { $LatestSignal.headline } else { 'none' }
-    $signalEvidence = if ($LatestSignal) { Get-ContentSnippet -Text $LatestSignal.content } else { 'none' }
-    $signalStatus = if ($LatestSignal) { $LatestSignal.status } else { 'none' }
-    $reviewedAt = if ($LatestSignal -and $LatestSignal.reviewed_at) { $LatestSignal.reviewed_at } else { 'pending' }
-    $publisherFeedback = if ($LatestSignal -and $LatestSignal.publisher_feedback) { $LatestSignal.publisher_feedback } else { 'none' }
+    $signalHeadline = if ($LatestSignal) { Get-SignalField -Signal $LatestSignal -Names @('headline') -DefaultValue 'none' } else { 'none' }
+    $signalEvidence = if ($LatestSignal) { Get-ContentSnippet -Text (Get-SignalField -Signal $LatestSignal -Names @('content') -DefaultValue '') } else { 'none' }
+    $signalStatus = if ($LatestSignal) { Get-SignalField -Signal $LatestSignal -Names @('status') -DefaultValue 'none' } else { 'none' }
+    $reviewedAt = if ($LatestSignal) { Get-SignalField -Signal $LatestSignal -Names @('reviewedAt', 'reviewed_at', 'reviewed') -DefaultValue 'pending' } else { 'pending' }
+    $publisherFeedback = if ($LatestSignal) { Get-SignalField -Signal $LatestSignal -Names @('publisherFeedback', 'publisher_feedback') -DefaultValue 'none' } else { 'none' }
     $takeaway = Get-ReviewTakeaway -SignalStatus $signalStatus -PublisherFeedback $publisherFeedback
 
     $entry = @"
@@ -236,10 +258,35 @@ $BtcAddress = $script:BtcAddress
 
 while ($true) {
     $status = Get-AgentStatus -Address $BtcAddress
-    $beatSlug = $status.status.beat.slug
-    $latestSignal = Get-LatestSignal -BeatSlug $beatSlug
+    $latestSignal = Get-LatestSignal -Address $BtcAddress
     Append-WatchLog -StatusPayload $status -LatestSignal $latestSignal
-    Write-Host ($status | ConvertTo-Json -Depth 8)
+    $latestSignalSnapshot = if ($latestSignal) {
+        [pscustomobject]@{
+            id = Get-SignalField -Signal $latestSignal -Names @('id')
+            headline = Get-SignalField -Signal $latestSignal -Names @('headline')
+            status = Get-SignalField -Signal $latestSignal -Names @('status')
+            reviewedAt = Get-SignalField -Signal $latestSignal -Names @('reviewedAt', 'reviewed_at', 'reviewed')
+            publisherFeedback = Get-SignalField -Signal $latestSignal -Names @('publisherFeedback', 'publisher_feedback')
+            timestamp = Get-SignalField -Signal $latestSignal -Names @('timestamp')
+        }
+    } else {
+        $null
+    }
+
+    $snapshot = [pscustomobject]@{
+        timestamp = (Get-Date).ToString('o')
+        address = $BtcAddress
+        beat = [pscustomobject]@{
+            slug = $status.status.beat.slug
+            name = $status.status.beat.name
+        }
+        signalsToday = $status.status.signalsToday
+        waitMinutes = $status.status.waitMinutes
+        latestSignal = $latestSignalSnapshot
+        takeaway = Get-ReviewTakeaway -SignalStatus (if ($latestSignalSnapshot) { $latestSignalSnapshot.status } else { 'none' }) -PublisherFeedback (if ($latestSignalSnapshot) { $latestSignalSnapshot.publisherFeedback } else { 'none' })
+    }
+
+    Write-Host ($snapshot | ConvertTo-Json -Depth 10)
 
     if (-not $Continuous) {
         break

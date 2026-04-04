@@ -1,0 +1,101 @@
+name: News Review Status
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '15 * * * *'
+
+concurrency:
+  group: news-review-status
+  cancel-in-progress: true
+
+jobs:
+  check-news-review:
+    runs-on: windows-latest
+    env:
+      NETWORK: mainnet
+      AIBTC_WALLET_PASSWORD: ${{ secrets.AIBTC_WALLET_PASSWORD }}
+      WALLET_PASSWORD: ${{ secrets.AIBTC_WALLET_PASSWORD }}
+      AIBTC_WALLET_MNEMONIC: ${{ secrets.AIBTC_WALLET_MNEMONIC }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install skills dependencies
+        shell: pwsh
+        run: |
+          Set-Location $env:GITHUB_WORKSPACE
+          Push-Location .\aibtcdev-skills
+          bun install
+          Pop-Location
+
+      - name: Import wallet into runner profile
+        id: import_wallet
+        shell: pwsh
+        run: |
+          Set-Location $env:GITHUB_WORKSPACE
+          if (-not $env:AIBTC_WALLET_MNEMONIC) {
+            throw 'Missing secret: AIBTC_WALLET_MNEMONIC'
+          }
+          if (-not $env:AIBTC_WALLET_PASSWORD) {
+            throw 'Missing secret: AIBTC_WALLET_PASSWORD'
+          }
+          Push-Location .\aibtcdev-skills
+          $importJson = & bun run wallet/wallet.ts import --name forge0btc --mnemonic "$env:AIBTC_WALLET_MNEMONIC" --password "$env:AIBTC_WALLET_PASSWORD" --network mainnet | Out-String
+          Pop-Location
+          $import = $importJson | ConvertFrom-Json
+          $import | ConvertTo-Json -Depth 10 | Set-Content -Path "$env:GITHUB_WORKSPACE\heartbeat-wallet.json"
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "wallet-id=$($import.walletId)"
+          $btcAddress = ($import.'Bitcoin (L1)'.'Native SegWit' -replace '\s+\(send/receive BTC\)$', '')
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "btc-address=$btcAddress"
+
+      - name: Check latest signal review status
+        shell: pwsh
+        run: |
+          Set-Location $env:GITHUB_WORKSPACE
+          $runLog = Join-Path $env:GITHUB_WORKSPACE 'daemon\news-review-status-run.log'
+          Start-Transcript -Path $runLog -Force | Out-Null
+          try {
+            $statusJson = & .\scripts\watch-news-review.ps1 -BtcAddress "${{ steps.import_wallet.outputs.btc-address }}" -IntervalMinutes 5 | Out-String
+            $statusJson | Set-Content -Path "$env:GITHUB_WORKSPACE\daemon\news-review-status.json"
+            $status = $statusJson | ConvertFrom-Json
+            $latestHeadline = if ($status.latestSignal) { $status.latestSignal.headline } else { 'none' }
+            $latestStatus = if ($status.latestSignal) { $status.latestSignal.status } else { 'none' }
+            $latestReviewedAt = if ($status.latestSignal) { $status.latestSignal.reviewedAt } else { 'pending' }
+            $latestFeedback = if ($status.latestSignal) { $status.latestSignal.publisherFeedback } else { 'none' }
+            @(
+              '# News Review Status'
+              ''
+              "- Address: $($status.address)"
+              "- Beat: $($status.beat.name) ($($status.beat.slug))"
+              "- Latest signal: $latestHeadline"
+              "- Latest status: $latestStatus"
+              "- Reviewed at: $latestReviewedAt"
+              "- Publisher feedback: $latestFeedback"
+              "- Takeaway: $($status.takeaway)"
+            ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+            Write-Host $statusJson
+          } catch {
+            Write-Host "News review status check failed."
+            Write-Host ($_ | Out-String)
+            throw
+          } finally {
+            Stop-Transcript | Out-Null
+          }
+
+      - name: Upload review artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: news-review-status
+          path: |
+            daemon/news-review-watch.md
+            daemon/news-review-status.json
+            daemon/news-review-status-run.log
+            heartbeat-wallet.json
+          if-no-files-found: ignore
