@@ -173,6 +173,41 @@ function Get-RecentSignals {
     return @()
 }
 
+function Get-TodaySignalCount {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Address
+    )
+
+    $command = @(
+        'run'
+        (Join-Path $skillsRoot 'aibtc-news\aibtc-news.ts')
+        'list-signals'
+        '--address'
+        $Address
+        '--limit'
+        100
+    )
+
+    $payload = Invoke-JsonCommand -Args $command
+    $signals = @($payload.signals)
+    $todayUtc = [datetime]::UtcNow.Date
+
+    return @(
+        $signals | Where-Object {
+            if (-not $_.timestamp) {
+                return $false
+            }
+
+            try {
+                ([datetime]::Parse($_.timestamp)).ToUniversalTime().Date -eq $todayUtc
+            } catch {
+                $false
+            }
+        }
+    ).Count
+}
+
 function Get-GitHubRelease {
     param(
         [Parameter(Mandatory = $true)]
@@ -546,6 +581,19 @@ try {
         $beat = $newsStatus.beat
         $beatSlug = $beat.slug
         $beatName = $beat.name
+
+        $todaySignalCount = Get-TodaySignalCount -Address $BtcAddress
+
+        if ($todaySignalCount -ge 3) {
+            Write-TopicLog -Message "Beat: $beatName ($beatSlug)`r`nSkipped: daily quality cap reached ($todaySignalCount/3). Try again tomorrow."
+            Write-Host "Daily quality cap reached ($todaySignalCount/3); nothing filed."
+            if (-not $Continuous) {
+                break
+            }
+
+            Start-Sleep -Seconds ($IntervalMinutes * 60)
+            continue
+        }
 
         if (-not $newsStatus.canFileSignal) {
             Write-TopicLog -Message "Beat: $beatName ($beatSlug)`r`nSkipped: $($newsStatus.actions[0].description)"
