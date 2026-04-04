@@ -241,4 +241,4 @@ Output:
 - `execute-endpoint` and `probe-endpoint` require an unlocked wallet when the endpoint requires payment
 - `send-inbox-message` requires an unlocked wallet with sBTC balance; the sponsored tx flow means no STX is needed for gas
 - Scaffold commands generate a complete project — run `npm install && npm run dev` in the generated directory to start
-- Network is controlled by the `NETWORK` environment variable (default: testnet); use `NETWORK=mainnet` for mainnet endpoints
+- Network is controlled by the `NETWORK` environment variable (default: mainnet); set `NETWORK=testnet` only when you intentionally need testnet endpoints

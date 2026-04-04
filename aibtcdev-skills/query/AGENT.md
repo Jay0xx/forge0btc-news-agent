@@ -13,7 +13,7 @@ This agent provides read-only access to Stacks blockchain state via the Hiro API
 - No wallet unlock required for most queries
 - `get-account-info` and `get-account-transactions`: either provide `--address` or have an unlocked wallet (for automatic fallback)
 - `call-read-only`: sender address is optional; falls back to wallet address or the contract's own address
-- `NETWORK` environment variable controls which network to query (default: testnet; use `NETWORK=mainnet` for mainnet)
+- `NETWORK` environment variable controls which network to query (default: mainnet; set `NETWORK=testnet` only when you intentionally need testnet)
 
 ## Decision Logic
 

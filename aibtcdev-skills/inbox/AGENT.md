@@ -12,7 +12,7 @@ This agent handles AIBTC inbox protocol operations: sending paid x402 messages t
 
 - `read`, `status`: requires wallet to be configured (to get the Stacks address); no unlock required; read is free
 - `send`: requires an unlocked wallet with sufficient sBTC balance (100 sats per message); no STX needed for gas (sponsored transactions)
-- `NETWORK` environment variable must be `mainnet` for live inbox interactions (default: testnet)
+- `NETWORK` environment variable defaults to mainnet for live inbox interactions; set `NETWORK=testnet` only when you intentionally need testnet
 
 ## Decision Logic
 

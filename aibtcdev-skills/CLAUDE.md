@@ -88,7 +88,7 @@ bun run btc/btc.ts transfer --recipient bc1q... --amount 100000 --fee-rate mediu
 bun run stx/stx.ts get-balance
 bun run stx/stx.ts deploy-contract --contract-name foo --code-body '(define-public (hello) (ok true))'
 
-# Network prefix for mainnet (default is testnet)
+# Network prefix for mainnet (set `NETWORK=testnet` only when you intentionally need testnet)
 NETWORK=mainnet bun run btc/btc.ts balance
 ```
 

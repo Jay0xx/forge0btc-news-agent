@@ -14,7 +14,7 @@ This agent handles x402 protocol operations: discovering and executing paid API 
 - `execute-endpoint` with a paid endpoint: requires an unlocked wallet with sufficient sBTC or STX balance
 - `send-inbox-message`: requires an unlocked wallet with sBTC balance (sponsored tx flow; no STX gas needed)
 - `scaffold-endpoint` and `scaffold-ai-endpoint`: no wallet required if `--recipient-address` is provided; otherwise uses active wallet
-- `NETWORK` environment variable must be `mainnet` for live payments (default: testnet)
+- `NETWORK` environment variable defaults to mainnet for live payments; set `NETWORK=testnet` only when you intentionally need testnet
 
 ## Decision Logic
 

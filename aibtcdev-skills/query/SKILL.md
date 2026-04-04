@@ -278,6 +278,6 @@ Output:
 ## Notes
 
 - All queries use the Hiro API (`api.mainnet.hiro.so` or `api.testnet.hiro.so`)
-- Network is controlled by the `NETWORK` environment variable (default: testnet)
+- Network is controlled by the `NETWORK` environment variable (default: mainnet)
 - `get-account-info` and `get-account-transactions` fall back to the active wallet address
 - `call-read-only` falls back to the contract's own address as sender if no wallet is active

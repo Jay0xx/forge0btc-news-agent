@@ -15,7 +15,7 @@ All balance queries are read-only and require no wallet unlock. The wallet `info
 ## Prerequisites
 
 - [ ] At least one wallet configured (`bun run wallet/wallet.ts list`)
-- [ ] Network set appropriately (`NETWORK=mainnet` for mainnet, default is testnet)
+- [ ] Network set appropriately (`NETWORK=mainnet` for mainnet; set `NETWORK=testnet` only when you intentionally need testnet)
 
 ## Steps
 

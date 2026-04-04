@@ -12,7 +12,7 @@ This agent manages ERC-8004 on-chain agent identities using the identity-registr
 
 - For write operations (register, set-uri, set-metadata, set-approval, set-wallet, unset-wallet, transfer): wallet must be unlocked — run `bun run wallet/wallet.ts unlock` first
 - For read operations (get, get-metadata, get-last-id): no wallet required
-- Network must be configured (defaults to testnet; set `NETWORK=mainnet` for mainnet)
+- Network must be configured (defaults to mainnet; set `NETWORK=testnet` only when you intentionally need testnet)
 - The agent ID must already exist on-chain before running set-uri, set-metadata, set-approval, set-wallet, unset-wallet, or transfer
 
 ## Decision Logic

@@ -3,7 +3,7 @@ import { StacksNetworkName } from "@stacks/network";
 export type Network = "mainnet" | "testnet";
 
 export const NETWORK: Network =
-  process.env.NETWORK === "mainnet" ? "mainnet" : "testnet";
+  process.env.NETWORK === "testnet" ? "testnet" : "mainnet";
 
 // Production x402 service options — all are legitimate and agents may choose any:
 //   https://x402.biwas.xyz  (biwas/secret-mars) — DeFi analytics, market data, wallet analysis
