@@ -35,6 +35,7 @@ jobs:
           Pop-Location
 
       - name: Import wallet into runner profile
+        id: import_wallet
         shell: pwsh
         run: |
           Set-Location $env:GITHUB_WORKSPACE
@@ -45,8 +46,31 @@ jobs:
             throw 'Missing secret: AIBTC_WALLET_PASSWORD'
           }
           Push-Location .\aibtcdev-skills
-          bun run wallet/wallet.ts import --name forge0btc --mnemonic "$env:AIBTC_WALLET_MNEMONIC" --password "$env:AIBTC_WALLET_PASSWORD" --network mainnet
+          $importJson = & bun run wallet/wallet.ts import --name forge0btc --mnemonic "$env:AIBTC_WALLET_MNEMONIC" --password "$env:AIBTC_WALLET_PASSWORD" --network mainnet | Out-String
           Pop-Location
+          $import = $importJson | ConvertFrom-Json
+          $import | ConvertTo-Json -Depth 10 | Set-Content -Path "$env:GITHUB_WORKSPACE\heartbeat-wallet.json"
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "wallet-id=$($import.walletId)"
+          $btcAddress = ($import.'Bitcoin (L1)'.'Native SegWit' -replace '\s+\(send/receive BTC\)$', '')
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "btc-address=$btcAddress"
+
+      - name: Unlock wallet for signal filing
+        shell: pwsh
+        run: |
+          Set-Location $env:GITHUB_WORKSPACE
+          Push-Location .\aibtcdev-skills
+          bun run wallet/wallet.ts unlock --wallet-id "${{ steps.import_wallet.outputs.wallet-id }}" --password "$env:AIBTC_WALLET_PASSWORD"
+          Pop-Location
+
+      - name: Preflight filing status
+        shell: pwsh
+        run: |
+          Set-Location $env:GITHUB_WORKSPACE
+          Push-Location .\aibtcdev-skills
+          $statusJson = & bun run aibtc-news/aibtc-news.ts status --address "${{ steps.import_wallet.outputs.btc-address }}" | Out-String
+          Pop-Location
+          $statusJson | Set-Content -Path "$env:GITHUB_WORKSPACE\daemon\news-signal-preflight-status.json"
+          Write-Host $statusJson
 
       - name: File a news signal if the window is open
         shell: pwsh
@@ -71,6 +95,8 @@ jobs:
           name: news-topic-log
           path: |
             daemon/news-topic.md
+            daemon/news-signal-preflight-status.json
             daemon/news-signal-automation-error.log
             daemon/news-signal-automation-run.log
+            heartbeat-wallet.json
           if-no-files-found: ignore
