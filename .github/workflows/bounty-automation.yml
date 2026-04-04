@@ -1,0 +1,93 @@
+name: Bounty Automation
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '15 * * * *'
+
+concurrency:
+  group: bounty-automation
+  cancel-in-progress: true
+
+jobs:
+  bounty-hunt:
+    runs-on: windows-latest
+    env:
+      NETWORK: mainnet
+      AIBTC_WALLET_PASSWORD: ${{ secrets.AIBTC_WALLET_PASSWORD }}
+      WALLET_PASSWORD: ${{ secrets.AIBTC_WALLET_PASSWORD }}
+      AIBTC_WALLET_MNEMONIC: ${{ secrets.AIBTC_WALLET_MNEMONIC }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install skills dependencies
+        shell: pwsh
+        run: |
+          Set-Location $env:GITHUB_WORKSPACE
+          Push-Location .\aibtcdev-skills
+          bun install
+          Pop-Location
+
+      - name: Import wallet into runner profile
+        id: import_wallet
+        shell: pwsh
+        run: |
+          Set-Location $env:GITHUB_WORKSPACE
+          if (-not $env:AIBTC_WALLET_MNEMONIC) {
+            throw 'Missing secret: AIBTC_WALLET_MNEMONIC'
+          }
+          if (-not $env:AIBTC_WALLET_PASSWORD) {
+            throw 'Missing secret: AIBTC_WALLET_PASSWORD'
+          }
+          Push-Location .\aibtcdev-skills
+          $importJson = & bun run wallet/wallet.ts import --name forge0btc-bounty --mnemonic "$env:AIBTC_WALLET_MNEMONIC" --password "$env:AIBTC_WALLET_PASSWORD" --network mainnet | Out-String
+          Pop-Location
+          $import = $importJson | ConvertFrom-Json
+          $import | ConvertTo-Json -Depth 10 | Set-Content -Path "$env:GITHUB_WORKSPACE\heartbeat-wallet.json"
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "wallet-id=$($import.walletId)"
+          $btcAddress = ($import.'Bitcoin (L1)'.'Native SegWit' -replace '\s+\(send/receive BTC\)$', '')
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "btc-address=$btcAddress"
+
+      - name: Unlock wallet for bounty claims
+        shell: pwsh
+        run: |
+          Set-Location $env:GITHUB_WORKSPACE
+          Push-Location .\aibtcdev-skills
+          bun run wallet/wallet.ts unlock --wallet-id "${{ steps.import_wallet.outputs.wallet-id }}" --password "$env:AIBTC_WALLET_PASSWORD"
+          Pop-Location
+
+      - name: Scan and auto-claim bounties
+        shell: pwsh
+        run: |
+          Set-Location $env:GITHUB_WORKSPACE
+          $runLog = Join-Path $env:GITHUB_WORKSPACE 'daemon\bounty-scan-run.log'
+          Start-Transcript -Path $runLog -Force | Out-Null
+          try {
+            & .\scripts\auto-bounty-scan.ps1 -WalletPassword "$env:AIBTC_WALLET_PASSWORD" -BtcAddress "${{ steps.import_wallet.outputs.btc-address }}" -AutoClaim -ClaimThreshold 0.7 -MinAmountSats 1000 -MaxClaims 1
+          } catch {
+            Write-Host "Bounty automation step failed."
+            Write-Host ($_ | Out-String)
+            throw
+          } finally {
+            Stop-Transcript | Out-Null
+          }
+
+      - name: Upload bounty artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bounty-automation-output
+          path: |
+            daemon/bounty-scan.md
+            daemon/bounty-scan.json
+            daemon/bounty-scan-run.log
+            daemon/bounty-scan-error.log
+            daemon/bounty-claim.log
+            heartbeat-wallet.json
+          if-no-files-found: ignore

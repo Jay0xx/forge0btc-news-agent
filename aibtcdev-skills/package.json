@@ -36,7 +36,7 @@
     "@stacks/transactions": "^7.3.1",
     "@stacks/wallet-sdk": "^7.2.0",
     "alex-sdk": "^3.2.1",
-    "axios": "^1.13.2",
+    "axios": "1.14.0",
     "commander": "^12.0.0",
     "dotenv": "^17.2.3",
     "micro-ordinals": "^0.3.0",
@@ -49,5 +49,11 @@
     "@types/bun": "latest",
     "@types/node": "^22.0.0",
     "typescript": "^5.7.0"
+  },
+  "overrides": {
+    "axios": "1.14.0"
+  },
+  "resolutions": {
+    "axios": "1.14.0"
   }
 }

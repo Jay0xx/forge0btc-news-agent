@@ -12,7 +12,19 @@ param(
     [string]$BtcAddress,
 
     [Parameter(Mandatory = $false)]
+    [string]$DraftOutputPath,
+
+    [Parameter(Mandatory = $false)]
+    [string]$DraftJsonPath,
+
+    [Parameter(Mandatory = $false)]
+    [string]$DraftInputPath,
+
+    [Parameter(Mandatory = $false)]
     [int]$IntervalMinutes = 5,
+
+    [Parameter(Mandatory = $false)]
+    [switch]$DraftOnly,
 
     [Parameter(Mandatory = $false)]
     [switch]$Continuous
@@ -29,6 +41,8 @@ $workspaceRoot = Join-Path $scriptRoot '..'
 $skillsRoot = Join-Path $workspaceRoot 'aibtcdev-skills'
 $topicLog = Join-Path $workspaceRoot 'daemon\news-topic.md'
 $errorLog = Join-Path $workspaceRoot 'daemon\news-signal-automation-error.log'
+$draftLog = if ($DraftOutputPath) { $DraftOutputPath } else { Join-Path $workspaceRoot 'daemon\news-next-draft.md' }
+$draftJsonLog = if ($DraftJsonPath) { $DraftJsonPath } else { [System.IO.Path]::ChangeExtension($draftLog, '.json') }
 $configPath = Join-Path $env:USERPROFILE '.aibtc\config.json'
 $walletsPath = Join-Path $env:USERPROFILE '.aibtc\wallets.json'
 
@@ -565,10 +579,97 @@ function Write-ErrorLog {
     Add-Content -Path $errorLog -Value "`r`n## $(Get-Date -Format 'yyyy-MM-ddTHH:mm:ssK')`r`n$Message`r`n"
 }
 
+function Read-DraftArtifact {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    if (-not (Test-Path $Path)) {
+        throw "Draft artifact was not found: $Path"
+    }
+
+    $artifact = Get-Content $Path -Raw | ConvertFrom-Json
+    if (-not $artifact.candidate -or -not $artifact.draft) {
+        throw "Draft artifact is missing candidate or draft content: $Path"
+    }
+
+    return $artifact
+}
+
+function Write-DraftOutput {
+    param(
+        [Parameter(Mandatory = $true)]
+        $Candidate,
+
+        [Parameter(Mandatory = $true)]
+        $Draft,
+
+        [Parameter(Mandatory = $true)]
+        [object]$Status
+    )
+
+    $artifact = [pscustomobject]@{
+        generatedAt = (Get-Date).ToString('o')
+        candidate = $Candidate
+        draft = $Draft
+        status = $Status
+    }
+
+    $statusJson = $Status | ConvertTo-Json -Depth 10
+    $draftBody = @"
+# forge0btc Next-Day News Draft
+
+Generated: $(Get-Date -Format 'yyyy-MM-ddTHH:mm:ssK')
+Mode: Draft only
+
+## Candidate
+
+- Repository: $($Candidate.repository)
+- Release: $($Candidate.name)
+- Tag: $($Candidate.tag)
+- Published: $($Candidate.publishedAt.ToString('o'))
+- URL: $($Candidate.htmlUrl)
+
+## Headline
+
+$($Draft.headline)
+
+## Body
+
+$($Draft.content)
+
+## Sources
+
+$(@($Draft.sources) | ForEach-Object { "- $($_.url)" } | Out-String)
+
+## Tags
+
+$(@($Draft.tags) | ForEach-Object { "- $_" } | Out-String)
+
+## Disclosure
+
+```json
+$($Draft.disclosure | ConvertTo-Json -Depth 10)
+```
+
+## Live Status Snapshot
+
+```json
+$statusJson
+```
+"@
+
+    Set-Content -Path $draftLog -Value $draftBody
+    $artifact | ConvertTo-Json -Depth 10 | Set-Content -Path $draftJsonLog
+}
+
 try {
     $bun = Resolve-BunPath -ExplicitPath $BunPath
-    $script:WalletPassword = $WalletPassword
-    Set-WalletEnvironment -Password $script:WalletPassword
+    if (-not $DraftOnly) {
+        $script:WalletPassword = $WalletPassword
+        Set-WalletEnvironment -Password $script:WalletPassword
+    }
     $context = Get-ActiveWalletContext
     $script:WalletId = $context.WalletId
     $script:BtcAddress = $context.BtcAddress
@@ -583,6 +684,39 @@ try {
         $beatName = $beat.name
 
         $todaySignalCount = Get-TodaySignalCount -Address $BtcAddress
+
+        if ($DraftOnly) {
+            $recentSignals = @(Get-RecentSignals -Limit 50)
+            $beatSignals = @(Get-RecentSignals -BeatSlug $beatSlug -Limit 20)
+            $allSignals = @($recentSignals + $beatSignals | Select-Object -Unique)
+            $candidates = Get-TopicCandidates
+            $candidate = Select-TopicCandidate -Candidates $candidates -Signals $allSignals
+
+            if (-not $candidate) {
+                Write-TopicLog -Message "Draft mode: all candidate topics are already covered in recent signals."
+                Write-Host "Draft mode: all candidate topics are already covered in recent signals; nothing drafted."
+            } else {
+                $draft = Build-SignalDraft -Candidate $candidate
+                Test-SignalDraft -Draft $draft -Candidate $candidate
+                Write-DraftOutput -Candidate $candidate -Draft $draft -Status $status
+                Write-TopicLog -Message @"
+Drafted for next day:
+Repository: $($candidate.repository)
+Tag: $($candidate.tag)
+Headline: $($draft.headline)
+Output: $draftLog
+Artifact: $draftJsonLog
+"@
+                Write-Host "Draft written to $draftLog"
+            }
+
+            if (-not $Continuous) {
+                break
+            }
+
+            Start-Sleep -Seconds ($IntervalMinutes * 60)
+            continue
+        }
 
         if ($todaySignalCount -ge 3) {
             Write-TopicLog -Message "Beat: $beatName ($beatSlug)`r`nSkipped: daily quality cap reached ($todaySignalCount/3). Try again tomorrow."
@@ -599,18 +733,36 @@ try {
             Write-TopicLog -Message "Beat: $beatName ($beatSlug)`r`nSkipped: $($newsStatus.actions[0].description)"
             Write-Host ($status | ConvertTo-Json -Depth 10)
         } else {
-            $recentSignals = @(Get-RecentSignals -Limit 50)
-            $beatSignals = @(Get-RecentSignals -BeatSlug $beatSlug -Limit 20)
-            $allSignals = @($recentSignals + $beatSignals | Select-Object -Unique)
-            $candidates = Get-TopicCandidates
-            $candidate = Select-TopicCandidate -Candidates $candidates -Signals $allSignals
-
-            if (-not $candidate) {
-                Write-TopicLog -Message "Skipped: all candidate topics are already covered in recent signals."
-                Write-Host "All candidate topics are already covered in recent signals; nothing filed."
-            } else {
-                $draft = Build-SignalDraft -Candidate $candidate
+            if ($DraftInputPath) {
+                $artifact = Read-DraftArtifact -Path $DraftInputPath
+                $candidate = $artifact.candidate
+                $draft = $artifact.draft
                 Test-SignalDraft -Draft $draft -Candidate $candidate
+                Write-TopicLog -Message @"
+Using draft artifact for filing:
+Artifact: $DraftInputPath
+Repository: $($candidate.repository)
+Tag: $($candidate.tag)
+Headline: $($draft.headline)
+"@
+            } else {
+                $recentSignals = @(Get-RecentSignals -Limit 50)
+                $beatSignals = @(Get-RecentSignals -BeatSlug $beatSlug -Limit 20)
+                $allSignals = @($recentSignals + $beatSignals | Select-Object -Unique)
+                $candidates = Get-TopicCandidates
+                $candidate = Select-TopicCandidate -Candidates $candidates -Signals $allSignals
+
+                if (-not $candidate) {
+                    Write-TopicLog -Message "Skipped: all candidate topics are already covered in recent signals."
+                    Write-Host "All candidate topics are already covered in recent signals; nothing filed."
+                } else {
+                    $draft = Build-SignalDraft -Candidate $candidate
+                    Test-SignalDraft -Draft $draft -Candidate $candidate
+                    Write-DraftOutput -Candidate $candidate -Draft $draft -Status $status
+                }
+            }
+
+            if ($candidate) {
                 $sourcesJson = @(
                     ($draft.sources | Select-Object -First 1).url
                 ) | ConvertTo-Json -Compress
@@ -639,6 +791,7 @@ try {
 
                 Write-TopicLog -Message @"
 Attempting signal filing:
+Artifact: $DraftInputPath
 Repository: $($candidate.repository)
 Tag: $($candidate.tag)
 Headline: $($draft.headline)

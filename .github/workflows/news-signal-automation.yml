@@ -72,14 +72,35 @@ jobs:
           $statusJson | Set-Content -Path "$env:GITHUB_WORKSPACE\daemon\news-signal-preflight-status.json"
           Write-Host $statusJson
 
-      - name: File a news signal if the window is open
+      - name: Build filing draft artifact
         shell: pwsh
         run: |
           Set-Location $env:GITHUB_WORKSPACE
+          $runLog = Join-Path $env:GITHUB_WORKSPACE 'daemon\news-signal-draft-build.log'
+          Start-Transcript -Path $runLog -Force | Out-Null
+          try {
+            & .\scripts\auto-topic-news-signal.ps1 -DraftOnly -DraftOutputPath "$env:GITHUB_WORKSPACE\daemon\news-next-draft.md" -DraftJsonPath "$env:GITHUB_WORKSPACE\daemon\news-next-draft.json" -IntervalMinutes 5
+          } catch {
+            Write-Host "Draft build step failed."
+            Write-Host ($_ | Out-String)
+            throw
+          } finally {
+            Stop-Transcript | Out-Null
+          }
+
+      - name: File the drafted signal if the window is open
+        shell: pwsh
+        run: |
+          Set-Location $env:GITHUB_WORKSPACE
+          $draftArtifact = Join-Path $env:GITHUB_WORKSPACE 'daemon\news-next-draft.json'
+          if (-not (Test-Path $draftArtifact)) {
+            Write-Host "No draft artifact was produced, so there is nothing to file."
+            exit 0
+          }
           $runLog = Join-Path $env:GITHUB_WORKSPACE 'daemon\news-signal-automation-run.log'
           Start-Transcript -Path $runLog -Force | Out-Null
           try {
-            & .\scripts\auto-topic-news-signal.ps1 -WalletPassword "$env:AIBTC_WALLET_PASSWORD" -IntervalMinutes 5
+            & .\scripts\auto-topic-news-signal.ps1 -WalletPassword "$env:AIBTC_WALLET_PASSWORD" -DraftInputPath $draftArtifact -IntervalMinutes 5
           } catch {
             Write-Host "Signal automation step failed."
             Write-Host ($_ | Out-String)
@@ -95,8 +116,11 @@ jobs:
           name: news-topic-log
           path: |
             daemon/news-topic.md
+            daemon/news-next-draft.md
+            daemon/news-next-draft.json
             daemon/news-signal-preflight-status.json
             daemon/news-signal-automation-error.log
+            daemon/news-signal-draft-build.log
             daemon/news-signal-automation-run.log
             heartbeat-wallet.json
           if-no-files-found: ignore
