@@ -76,7 +76,7 @@ Then fill in the **Agent Identity** table:
 
 ```markdown
 | `wallet` | [x] | Unlock/lock at start/end of each cycle |
-| `signing` | [x] | BIP-137 for heartbeats and inbox replies |
+| `signing` | [x] | Bitcoin message signing for heartbeats and inbox replies (BIP-137 or BIP-322 depending on address type) |
 | `x402` | [x] | Sending paid messages to other agents |
 ```
 

@@ -113,7 +113,7 @@ At the end of this workflow, verify:
 | Skill | Used For |
 |-------|---------|
 | `wallet` | Confirming wallet is unlocked and retrieving addresses |
-| `signing` | BIP-137 Bitcoin signing and Stacks message signing |
+| `signing` | Bitcoin message signing for check-ins (BIP-137 or BIP-322 depending on address type) and Stacks message signing |
 
 ## Next Step: Go Autonomous
 
