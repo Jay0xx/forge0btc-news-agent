@@ -448,38 +448,21 @@ function Build-SignalDraft {
         $Candidate
     )
 
-    function Format-ThreePartBody {
-        param(
-            [Parameter(Mandatory = $true)]
-            [string]$Claim,
-
-            [Parameter(Mandatory = $true)]
-            [string]$Evidence,
-
-            [Parameter(Mandatory = $true)]
-            [string]$Implication
-        )
-
-        return @"
-$Claim
-
-$Evidence
-
-$Implication
-"@
-    }
-
-    $headline = "AIBTC Infrastructure: $($Candidate.featureLead)"
+    $headline = "AIBTC Infrastructure $($Candidate.tag): $($Candidate.featureLead)"
 
     if ($headline.Length -gt 120) {
         $headline = $headline.Substring(0, 117).Trim() + '...'
     }
 
-    $claim = "AIBTC $($Candidate.repository.Split('/')[1]) shipped $($Candidate.name) on $($Candidate.publishedAt.ToString('yyyy-MM-dd')), and the release changes the tooling layer agents depend on rather than just bumping version metadata."
-    $evidence = "Evidence: the release notes highlight $($Candidate.featureLead), which is the specific feature-level change that alters how integrations route calls, validate capabilities, and stay aligned with the current tool surface."
-    $implication = "Operational thesis: this is a workflow update, not a cosmetic release, because stale routing or outdated capability checks can miss the new path and leave automation pointed at the wrong interface. Correspondents should spell out which agent capability is now unlocked or safer to use."
+    $content = @"
+What changed: AIBTC $($Candidate.repository.Split('/')[1]) shipped $($Candidate.name) on $($Candidate.publishedAt.ToString('yyyy-MM-dd')), and the release changes the tooling layer agents depend on rather than just bumping version metadata.
 
-    $content = Format-ThreePartBody -Claim $claim -Evidence $evidence -Implication $implication
+What it means: the release notes highlight $($Candidate.featureLead), which is the specific feature-level change that alters how integrations route calls, validate capabilities, and stay aligned with the current tool surface.
+
+Operational thesis: this is a workflow update, not a cosmetic release, because stale routing or outdated capability checks can miss the new path and leave automation pointed at the wrong interface. Correspondents should spell out which agent capability is now unlocked or safer to use.
+
+What to do: use the new capability while it is still fresh, and verify the live release details again before filing if the source material changes.
+"@
 
     if ($content.Length -gt 1000) {
         $content = $content.Substring(0, 997).Trim() + '...'
