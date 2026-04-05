@@ -251,6 +251,7 @@ function Append-WatchLog {
     $stamp = Get-Date -Format 'yyyy-MM-ddTHH:mm:ssK'
     $beatSlug = $StatusPayload.status.beat.slug
     $beatName = $StatusPayload.status.beat.name
+    $agentDisplayName = if ($StatusPayload.status.displayName) { $StatusPayload.status.displayName } else { 'Marble Bolt' }
     $signalsToday = $StatusPayload.status.signalsToday
     $waitMinutes = if ($StatusPayload.status.waitMinutes) { "$($StatusPayload.status.waitMinutes) minutes" } else { 'none' }
     $signalDisplayName = if ($LatestSignal) { Get-SignalField -Signal $LatestSignal -Names @('displayName', 'display_name') -DefaultValue 'none' } else { 'none' }
@@ -268,7 +269,8 @@ function Append-WatchLog {
 ## $stamp
 - Address: $($StatusPayload.address)
 - Beat: $beatName ($beatSlug)
-- Display name: $signalDisplayName
+- Display name: $agentDisplayName
+- Latest signal display name: $signalDisplayName
 - Latest signal id: $signalId
 - Claim: $signalHeadline
 - Evidence: $signalEvidence
@@ -313,6 +315,14 @@ while ($true) {
         $null
     }
 
+    $agentDisplayNameSnapshot = if ($status.status.displayName) { $status.status.displayName } else { 'Marble Bolt' }
+    $latestSignalDisplayNameSnapshot = if ($latestSignalSnapshot) { Get-SignalField -Signal $latestSignal -Names @('displayName', 'display_name') -DefaultValue 'none' } else { 'none' }
+    $queueStateSnapshot = if ($latestSignalSnapshot) { Get-QueueState -SignalStatus $latestSignalSnapshot.status } else { 'unknown' }
+    $siteVisibilitySnapshot = if ($latestSignalSnapshot) { Get-SiteVisibility -SignalStatus $latestSignalSnapshot.status } else { 'unknown' }
+    $takeawaySignalStatus = if ($latestSignalSnapshot) { $latestSignalSnapshot.status } else { 'none' }
+    $takeawayPublisherFeedback = if ($latestSignalSnapshot) { $latestSignalSnapshot.publisherFeedback } else { 'none' }
+    $takeawaySnapshot = Get-ReviewTakeaway -SignalStatus $takeawaySignalStatus -PublisherFeedback $takeawayPublisherFeedback
+
     $snapshot = [pscustomobject]@{
         timestamp = (Get-Date).ToString('o')
         address = $BtcAddress
@@ -320,13 +330,14 @@ while ($true) {
             slug = $status.status.beat.slug
             name = $status.status.beat.name
         }
+        displayName = $agentDisplayNameSnapshot
         signalsToday = $status.status.signalsToday
         waitMinutes = $status.status.waitMinutes
         latestSignal = $latestSignalSnapshot
-        displayName = if ($latestSignalSnapshot) { Get-SignalField -Signal $latestSignal -Names @('displayName', 'display_name') -DefaultValue 'none' } else { 'none' }
-        queueState = if ($latestSignalSnapshot) { Get-QueueState -SignalStatus $latestSignalSnapshot.status } else { 'unknown' }
-        siteVisibility = if ($latestSignalSnapshot) { Get-SiteVisibility -SignalStatus $latestSignalSnapshot.status } else { 'unknown' }
-        takeaway = Get-ReviewTakeaway -SignalStatus (if ($latestSignalSnapshot) { $latestSignalSnapshot.status } else { 'none' }) -PublisherFeedback (if ($latestSignalSnapshot) { $latestSignalSnapshot.publisherFeedback } else { 'none' })
+        latestSignalDisplayName = $latestSignalDisplayNameSnapshot
+        queueState = $queueStateSnapshot
+        siteVisibility = $siteVisibilitySnapshot
+        takeaway = $takeawaySnapshot
     }
 
     Write-Host ($snapshot | ConvertTo-Json -Depth 10)

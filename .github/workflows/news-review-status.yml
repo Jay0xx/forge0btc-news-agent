@@ -65,6 +65,7 @@ jobs:
             $statusJson | Set-Content -Path "$env:GITHUB_WORKSPACE\daemon\news-review-status.json"
             $status = $statusJson | ConvertFrom-Json
             $displayName = if ($status.displayName) { $status.displayName } else { 'none' }
+            $latestDisplayName = if ($status.latestSignalDisplayName) { $status.latestSignalDisplayName } else { 'none' }
             $latestId = if ($status.latestSignal) { $status.latestSignal.id } else { 'none' }
             $latestHeadline = if ($status.latestSignal) { $status.latestSignal.headline } else { 'none' }
             $latestStatus = if ($status.latestSignal) { $status.latestSignal.status } else { 'none' }
@@ -76,6 +77,7 @@ jobs:
               "- Address: $($status.address)"
               "- Beat: $($status.beat.name) ($($status.beat.slug))"
               "- Display name: $displayName"
+              "- Latest signal display name: $latestDisplayName"
               "- Latest signal id: $latestId"
               "- Latest signal: $latestHeadline"
               "- Latest status: $latestStatus"
