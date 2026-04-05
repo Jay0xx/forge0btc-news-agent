@@ -207,6 +207,38 @@ function Get-ReviewTakeaway {
     }
 }
 
+function Get-QueueState {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$SignalStatus
+    )
+
+    switch ($SignalStatus) {
+        'submitted' { return 'in-backlog' }
+        'in_review' { return 'in-review' }
+        'approved' { return 'approved' }
+        'brief_included' { return 'public' }
+        'rejected' { return 'rejected' }
+        default { return 'unknown' }
+    }
+}
+
+function Get-SiteVisibility {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$SignalStatus
+    )
+
+    switch ($SignalStatus) {
+        'approved' { return 'visible-on-front-page' }
+        'brief_included' { return 'visible-on-front-page' }
+        'submitted' { return 'queued-not-public' }
+        'in_review' { return 'reviewing-not-public' }
+        'rejected' { return 'not-public' }
+        default { return 'unknown' }
+    }
+}
+
 function Append-WatchLog {
     param(
         [Parameter(Mandatory = $true)]
@@ -221,20 +253,28 @@ function Append-WatchLog {
     $beatName = $StatusPayload.status.beat.name
     $signalsToday = $StatusPayload.status.signalsToday
     $waitMinutes = if ($StatusPayload.status.waitMinutes) { "$($StatusPayload.status.waitMinutes) minutes" } else { 'none' }
+    $signalDisplayName = if ($LatestSignal) { Get-SignalField -Signal $LatestSignal -Names @('displayName', 'display_name') -DefaultValue 'none' } else { 'none' }
     $signalHeadline = if ($LatestSignal) { Get-SignalField -Signal $LatestSignal -Names @('headline') -DefaultValue 'none' } else { 'none' }
     $signalEvidence = if ($LatestSignal) { Get-ContentSnippet -Text (Get-SignalField -Signal $LatestSignal -Names @('content') -DefaultValue '') } else { 'none' }
     $signalStatus = if ($LatestSignal) { Get-SignalField -Signal $LatestSignal -Names @('status') -DefaultValue 'none' } else { 'none' }
+    $signalId = if ($LatestSignal) { Get-SignalField -Signal $LatestSignal -Names @('id') -DefaultValue 'none' } else { 'none' }
     $reviewedAt = if ($LatestSignal) { Get-SignalField -Signal $LatestSignal -Names @('reviewedAt', 'reviewed_at', 'reviewed') -DefaultValue 'pending' } else { 'pending' }
     $publisherFeedback = if ($LatestSignal) { Get-SignalField -Signal $LatestSignal -Names @('publisherFeedback', 'publisher_feedback') -DefaultValue 'none' } else { 'none' }
     $takeaway = Get-ReviewTakeaway -SignalStatus $signalStatus -PublisherFeedback $publisherFeedback
+    $queueState = Get-QueueState -SignalStatus $signalStatus
+    $siteVisibility = Get-SiteVisibility -SignalStatus $signalStatus
 
     $entry = @"
 ## $stamp
 - Address: $($StatusPayload.address)
 - Beat: $beatName ($beatSlug)
+- Display name: $signalDisplayName
+- Latest signal id: $signalId
 - Claim: $signalHeadline
 - Evidence: $signalEvidence
 - Signal status: $signalStatus
+- Queue state: $queueState
+- Site visibility: $siteVisibility
 - Reviewed at: $reviewedAt
 - Publisher feedback: $publisherFeedback
 - Takeaway: $takeaway
@@ -283,6 +323,9 @@ while ($true) {
         signalsToday = $status.status.signalsToday
         waitMinutes = $status.status.waitMinutes
         latestSignal = $latestSignalSnapshot
+        displayName = if ($latestSignalSnapshot) { Get-SignalField -Signal $latestSignal -Names @('displayName', 'display_name') -DefaultValue 'none' } else { 'none' }
+        queueState = if ($latestSignalSnapshot) { Get-QueueState -SignalStatus $latestSignalSnapshot.status } else { 'unknown' }
+        siteVisibility = if ($latestSignalSnapshot) { Get-SiteVisibility -SignalStatus $latestSignalSnapshot.status } else { 'unknown' }
         takeaway = Get-ReviewTakeaway -SignalStatus (if ($latestSignalSnapshot) { $latestSignalSnapshot.status } else { 'none' }) -PublisherFeedback (if ($latestSignalSnapshot) { $latestSignalSnapshot.publisherFeedback } else { 'none' })
     }
 

@@ -64,6 +64,8 @@ jobs:
             $statusJson = & .\scripts\watch-news-review.ps1 -BtcAddress "${{ steps.import_wallet.outputs.btc-address }}" -IntervalMinutes 5 | Out-String
             $statusJson | Set-Content -Path "$env:GITHUB_WORKSPACE\daemon\news-review-status.json"
             $status = $statusJson | ConvertFrom-Json
+            $displayName = if ($status.displayName) { $status.displayName } else { 'none' }
+            $latestId = if ($status.latestSignal) { $status.latestSignal.id } else { 'none' }
             $latestHeadline = if ($status.latestSignal) { $status.latestSignal.headline } else { 'none' }
             $latestStatus = if ($status.latestSignal) { $status.latestSignal.status } else { 'none' }
             $latestReviewedAt = if ($status.latestSignal) { $status.latestSignal.reviewedAt } else { 'pending' }
@@ -73,8 +75,12 @@ jobs:
               ''
               "- Address: $($status.address)"
               "- Beat: $($status.beat.name) ($($status.beat.slug))"
+              "- Display name: $displayName"
+              "- Latest signal id: $latestId"
               "- Latest signal: $latestHeadline"
               "- Latest status: $latestStatus"
+              "- Queue state: $($status.queueState)"
+              "- Site visibility: $($status.siteVisibility)"
               "- Reviewed at: $latestReviewedAt"
               "- Publisher feedback: $latestFeedback"
               "- Takeaway: $($status.takeaway)"
