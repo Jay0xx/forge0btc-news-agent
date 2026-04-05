@@ -26,6 +26,7 @@ The generated logs and output files in `daemon/` and the `*-output.*` files are 
 - Run `scripts/install-news-signal-automation.ps1` once to install a Startup launcher that starts the news auto-filer automatically at logon.
 - Use `.github/workflows/news-signal-automation.yml` if you want GitHub Actions to build a draft artifact and then file from that draft when the window is open. It expects `AIBTC_WALLET_MNEMONIC` and `AIBTC_WALLET_PASSWORD` secrets.
 - Use `.github/workflows/news-draft-automation.yml` if you want GitHub Actions to generate a next-day live-data draft without filing it. It expects the same wallet secrets and uploads the markdown and JSON draft artifacts.
+- Use `.github/workflows/news-today-draft-automation.yml` if you want GitHub Actions to generate a same-day live-data draft for the current filing window. It expects the same wallet secrets and uploads the markdown and JSON draft artifacts.
 - Use `.github/workflows/news-review-status.yml` if you want GitHub Actions to check whether your latest signal was approved, rejected, or still submitted. It expects the same wallet secrets and uploads the review snapshot artifact.
 - Use `.github/workflows/bounty-automation.yml` if you want GitHub Actions to scan the bounty board, rank matches against installed skills, and auto-claim only high-confidence open bounties. It expects the same wallet secrets and uploads scan/claim artifacts.
 - Use `daemon/news-signal-template.md` as the canonical filing template for manual drafts; the auto-filer validates the same structure before filing.

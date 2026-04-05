@@ -1,0 +1,84 @@
+name: News Today Draft Automation
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '30 11 * * *'
+
+concurrency:
+  group: news-today-draft-automation
+  cancel-in-progress: true
+
+jobs:
+  draft-news:
+    runs-on: windows-latest
+    env:
+      NETWORK: mainnet
+      AIBTC_WALLET_PASSWORD: ${{ secrets.AIBTC_WALLET_PASSWORD }}
+      WALLET_PASSWORD: ${{ secrets.AIBTC_WALLET_PASSWORD }}
+      AIBTC_WALLET_MNEMONIC: ${{ secrets.AIBTC_WALLET_MNEMONIC }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install skills dependencies
+        shell: pwsh
+        run: |
+          Set-Location $env:GITHUB_WORKSPACE
+          Push-Location .\aibtcdev-skills
+          bun install
+          Pop-Location
+
+      - name: Import wallet into runner profile
+        id: import_wallet
+        shell: pwsh
+        run: |
+          Set-Location $env:GITHUB_WORKSPACE
+          if (-not $env:AIBTC_WALLET_MNEMONIC) {
+            throw 'Missing secret: AIBTC_WALLET_MNEMONIC'
+          }
+          if (-not $env:AIBTC_WALLET_PASSWORD) {
+            throw 'Missing secret: AIBTC_WALLET_PASSWORD'
+          }
+          Push-Location .\aibtcdev-skills
+          $importJson = & bun run wallet/wallet.ts import --name forge0btc --mnemonic "$env:AIBTC_WALLET_MNEMONIC" --password "$env:AIBTC_WALLET_PASSWORD" --network mainnet | Out-String
+          Pop-Location
+          $import = $importJson | ConvertFrom-Json
+          $import | ConvertTo-Json -Depth 10 | Set-Content -Path "$env:GITHUB_WORKSPACE\heartbeat-wallet.json"
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "wallet-id=$($import.walletId)"
+          $btcAddress = ($import.'Bitcoin (L1)'.'Native SegWit' -replace '\s+\(send/receive BTC\)$', '')
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "btc-address=$btcAddress"
+
+      - name: Build same-day draft from live data
+        shell: pwsh
+        run: |
+          Set-Location $env:GITHUB_WORKSPACE
+          $runLog = Join-Path $env:GITHUB_WORKSPACE 'daemon\news-today-draft-automation-run.log'
+          Start-Transcript -Path $runLog -Force | Out-Null
+          try {
+            & .\scripts\auto-topic-news-signal.ps1 -DraftOnly -DraftOutputPath "$env:GITHUB_WORKSPACE\daemon\news-today-draft.md" -DraftJsonPath "$env:GITHUB_WORKSPACE\daemon\news-today-draft.json" -IntervalMinutes 5
+          } catch {
+            Write-Host "Today draft automation step failed."
+            Write-Host ($_ | Out-String)
+            throw
+          } finally {
+            Stop-Transcript | Out-Null
+          }
+
+      - name: Upload today draft artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: news-today-draft
+          path: |
+            daemon/news-today-draft.md
+            daemon/news-today-draft.json
+            daemon/news-today-draft-automation-run.log
+            daemon/news-signal-automation-error.log
+            heartbeat-wallet.json
+          if-no-files-found: ignore
